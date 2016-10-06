@@ -1,47 +1,20 @@
-# Windows image file caches
-Thumbs.db
-ehthumbs.db
-
-# Folder config file
-Desktop.ini
-
-# Recycle Bin used on file shares
-$RECYCLE.BIN/
-
-# Windows Installer files
-*.cab
-*.msi
-*.msm
-*.msp
-
-# Windows shortcuts
-*.lnk
-
-# =========================
-# Operating System Files
-# =========================
-
-# OSX
-# =========================
-
-.DS_Store
-.AppleDouble
-.LSOverride
-
-# Thumbnails
-._*
-
-# Files that might appear in the root of a volume
-.DocumentRevisions-V100
-.fseventsd
-.Spotlight-V100
-.TemporaryItems
-.Trashes
-.VolumeIcon.icns
-
-# Directories potentially created on remote AFP share
-.AppleDB
-.AppleDesktop
-Network Trash Folder
-Temporary Items
-.apdisk
+.bundle
+db/*.sqlite3
+log/
+tmp/
+config/initializers/secret_token.rb
+config/database.yml
+config/*.sphinx.conf
+public/auto_style_screenshots/
+public/style_screenshots
+public/style_screenshot_thumbnails
+public/auto_style_screenshots
+config/initializers/password_salt.rb
+config/initializers/vanilla.rb
+config/initializers/omniauth.rb
+db/sphinx
+db/cstore
+config/initializers/jerks.rb
+.ruby-gemset
+.ruby-version
+.travis.yml

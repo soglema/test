@@ -1,0 +1,359 @@
+<% content_for :header_includes do %>
+	<link rel="stylish-code" href="<%=url_for(id: params['id'], host: DOMAIN, protocol: DOMAIN_PROTOCOL)%>.css">
+	<script>document.querySelector("link[rel='stylish-code']").setAttribute("href", "#stylish-code");</script>
+
+	<link rel="stylish-description" href="#stylish-description">
+	<link rel="stylish-install-ping-url" href="<%=url_for(action: 'install', id: params['id'], source: 'stylish-fx', host: DOMAIN, protocol: DOMAIN_PROTOCOL)%>">
+	<link rel="stylish-install-ping-url-chrome" href="<%=url_for(action: 'install', id: params['id'], source: 'stylish-ch', host: DOMAIN, protocol: DOMAIN_PROTOCOL)%>">
+	<link rel="stylish-install-ping-url-opera" href="<%=url_for(action: 'install', id: params['id'], source: 'stylish-op', host: DOMAIN, protocol: DOMAIN_PROTOCOL)%>">
+	<link rel="stylish-install-ping-url-safari" href="<%=url_for(action: 'install', id: params['id'], source: 'stylish-sf', host: DOMAIN, protocol: DOMAIN_PROTOCOL)%>">
+	<link rel="stylish-install-ping-url-dolphin" href="<%=url_for(action: 'install', id: params['id'], source: 'stylish-do', host: DOMAIN, protocol: DOMAIN_PROTOCOL)%>">
+	<link rel="stylish-code-chrome" href="<%=url_for(action: 'chrome_json', id: @style.id, host: DOMAIN, protocol: DOMAIN_PROTOCOL)%>">
+	<link rel="stylish-code-opera" href="<%=url_for(action: 'chrome_json', id: @style.id, host: DOMAIN, protocol: DOMAIN_PROTOCOL)%>">
+	<link rel="stylish-id-url" href="http://<%=DOMAIN%>/styles/<%=@style.id%>">
+	<link rel="stylish-md5-url" href="<%=UPDATE_DOMAIN%>/<%=@style.id%>.md5">
+	<link rel="stylish-update-url" href="<%=url_for(id: params['id'], host: DOMAIN, protocol: DOMAIN_PROTOCOL)%>.css">
+
+	<% if @style.style_settings.any?{|s| s.setting_type == "color"} %>
+		<%=javascript_include_tag 'jscolor.js'%>
+	<% end %>
+
+	<% if !@style.screenshot_url.nil? %>
+		<link rel="stylish-example-url" href="<%=@style.screenshot_url%>">
+	<% end %>
+<% end %>
+
+<% cache_unless(session[:user_id] == @style.user_id || jerk_user, @style) do %>
+
+<% if @style.obsolete > 0 %>
+	<section id="obsoletion-message">
+		<h2>Deleted!</h2>
+		<p>
+			This style was deleted by 
+			<% if @style.admin_delete_reason_id.nil? %>
+				its author, <%= link_to @style.user.name, {:controller => "users", :action => "show", :id => @style.user.id} %>.
+			<% else %>
+				the site admin.
+			<% end %>
+			<% if !@style.obsoletion_message.nil? and !@style.obsoletion_message.empty? %>
+				The reason given was <q><%=format_user_text(@style.obsoletion_message)%></q>.
+			<% end %>
+			<% if !@style.obsoleting_style.nil?  and @style.obsoleting_style.obsolete == 0
+				alternative = @style.obsoleting_style
+			elsif !@style.related.nil? and !@style.related.empty? 
+				alternative = @style.related.first
+			end 
+			if !alternative.nil? 
+				if !alternative.after_screenshot_thumbnail_path.nil? %>
+					Instead, try:</p><p><a href="<%=alternative.pretty_url%>"><img src="<%=alternative.after_screenshot_thumbnail_path%>" class="screenshot" alt=""><br><%=alternative.short_description%></a>
+				<% else %>
+					Instead, try <a href="<%=alternative.pretty_url%>"><%=alternative.short_description%></a>
+				<% end 
+				if !@style.subcategory.nil? and @style.category == 'site'%>
+					or other <%=link_to("#{@style.subcategory.capitalize} themes", :action => "browse", :controller => "styles", :category => @style.subcategory) %>.
+				<% elsif !@style.category.nil? %>
+					or other <%=link_to("#{@style.category.capitalize} themes", :action => "browse", :controller => "styles", :category => @style.category) %>.
+				<% end
+			end %>
+		</p>
+	</section>
+<% end %>
+
+<div id="stylish-event-element" style="display: none;"></div>
+
+<div id="left-info">
+	<div id="screenshots">
+		<% 
+		after = @style.after_screenshot_path
+		after_thumb = @style.after_screenshot_thumbnail_path
+
+		if !after_thumb.nil? and @style.obsolete == 0 %>
+			<figure id="main-screenshot" class="screenshot-thumbnail">
+				<a href="<%=after%>" data-lightbox="screenshot" rel="nofollow" title="With the style applied"><img src="<%=after_thumb%>" class="screenshot" alt=""></a>
+			</figure>
+		<% end 
+		has_more_screenshots = @style.obsolete == 0 && @style.screenshots.size > 0
+
+		if has_more_screenshots %>
+			<div id="more-screenshots">
+				<span>More screenshots:</span>
+				<% @style.screenshots.each do |screenshot| %>
+					<a href="<%=screenshot.full_path%>" data-lightbox="screenshot" rel="nofollow" title="<%=screenshot.description%>"><%=screenshot.description%></a><% if @style.screenshots.last != screenshot %>, <% end
+				end %>
+			</div>
+		<% end 
+
+		if @style.obsolete == 1 or (!has_more_screenshots and after.nil?) %>
+			<div class="no-screenshots">(No screenshot available)</div>
+		<% end %>
+	</div>
+
+</div>
+
+<section id="style-info">
+
+	<div id="main-style-info">
+
+		<div id="long-description">
+			<%=format_user_text(@style.long_description[0, 1000])%>
+		</div>
+
+		<% if !@style.style_settings.empty? %>
+			<ul id="style-settings">
+				<% @style.style_settings.each do |setting|%>
+					<% if setting.setting_type == 'color' %>
+						<li>
+							<label for="setting-<%=setting.id%>"><%=setting.label%></label>
+							<input id="setting-<%=setting.id%>" name="ik-<%=setting.install_key%>" type="text" class="style-setting-option color {hash:true,required:true}" value="<%=setting.style_setting_options.first.value%>" size="7" maxlength="7">
+						</li>
+					<% elsif setting.setting_type == 'text' %>
+						<li>
+							<label for="setting-<%=setting.id%>"><%=setting.label%></label>
+							<input id="setting-<%=setting.id%>" name="ik-<%=setting.install_key%>" type="text" class="style-setting-option" value="<%=setting.style_setting_options.first.value%>" size="10" maxlength="50">
+						</li>
+					<% elsif setting.setting_type == 'dropdown' %>
+						<li>
+							<label for="setting-<%=setting.id%>"><%=setting.label%></label>
+							<select id="setting-<%=setting.id%>" name="ik-<%=setting.install_key%>" class="style-setting-option">
+								<% setting.style_setting_options.each do |option|%>
+									<option value="ik-<%=option.install_key%>" <%if option.default%>selected<%end%>><%=option.label%></option>
+								<% end %>
+							</select>
+						</li>
+					<% elsif setting.setting_type == 'image' %>
+						<li>
+							<label><%=setting.label%></label>
+							<ul>
+								<% setting.style_setting_options.each do |option|%>
+									<li><input type="radio" id="option-<%=option.id%>" name="ik-<%=setting.install_key%>" class="style-setting-option" <%if option.default%>checked<%end%> value="ik-<%=option.install_key%>"> <label for="option-<%=option.id%>"><%=option.label%></label> <a href="<%=option.value%>" rel="lightbox[option-<%=option.id%>] nofollow" title="<%=option.label%>">See it</a></li>
+								<% end %>
+								<li><input type="radio" id="option-url-choice-<%=setting.id%>" name="ik-<%=setting.install_key%>" class="style-setting-option" value="user-url" <%if setting.style_setting_options.empty?%>checked<%end%> data-related-input="option-user-url-<%=setting.id%>"> <label for="option-url-choice-<%=setting.id%>">Provide your own</label> <input id="option-user-url-<%=setting.id%>" class="option-user-url" type="url" placeholder="URL"></li>
+								<li class="upload-control"><input type="radio" id="option-upload-choice-<%=setting.id%>" name="ik-<%=setting.install_key%>" class="style-setting-option" value="user-upload"> <label for="option-upload-choice-<%=setting.id%>">Upload your own</label> <input id="option-user-upload-<%=setting.id%>" class="option-user-upload" type="file" accept="image/*"></li>
+							</ul>
+						</li>
+					<% end %>
+				<% end %>
+			</ul>
+		<% end %>
+
+		<%= render :partial => 'install', :locals => {:style => @style} %>
+
+		<% experiment_chitika_on = false
+		if false %>
+			<div id="post-install-ad" class="afterdownload-ad" style="display: none">
+				<iframe scrolling="no" frameborder="0" allowtransparency="true" height="250" width="300" style="border:0;" src="http://d.delivery45.com/widget/render/hash/6827d19122799f24c0d420689bf42199"></iframe>
+			</div>
+		<% elsif experiment_chitika_on %>
+			<div id="post-install-ad" class="chitika-ad" style="display: none">
+				<script type="text/javascript">
+				  ( function() {
+					if (window.CHITIKA === undefined) { window.CHITIKA = { 'units' : [] }; };
+					var unit = {"publisher":"jasonbarnabe","width":300,"height":250,"sid":"Chitika Default"};
+					var placement_id = window.CHITIKA.units.length;
+					window.CHITIKA.units.push(unit);
+					document.write('<div id="chitikaAdBlock-' + placement_id + '"></div>');
+					var s = document.createElement('script');
+					s.type = 'text/javascript';
+					s.src = '//cdn.chitika.net/getads.js';
+					try { document.getElementsByTagName('head')[0].appendChild(s); } catch(e) { document.write(s.outerHTML); }
+				}());
+				</script>
+			</div>
+		<% end %>
+	</div>
+
+	<div id="hidden-meta">
+		<div id="stylish-description" rel="dct:title"><%=@style.short_description%></div>
+		<div id="user-id"><%=@style.user_id%></div>
+		<div id="style-id"><%=@style.id%></div>
+		<div id="subcategory"><%=@style.subcategory%></div>
+	</div>
+
+	<%
+	# We can't overlap the ads, even with select boxes. If we have anything that might overlap it, show it further below.
+	# - Text and image are OK
+	# - Color opens a pop-up, not OK
+	# - Dropdown settings past a certain length, not OK
+	show_ad_above_meta = @style.style_settings.all? {|ss| ['text', 'image'].include?(ss.setting_type) or (ss.setting_type == 'dropdown' and ss.style_setting_options.length <= 3) }
+	if (@no_ads.nil? or !@no_ads) and show_ad_above_meta %>
+		<div id="below-install-ad" class="ad">
+			<div class="ad-note"><span>Advertisement</span></div>
+			<script async src="//pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"></script>
+			<!-- Style pages below install responsive -->
+			<ins class="adsbygoogle"
+				 style="display:block"
+				 data-ad-client="ca-pub-2247465624637408"
+				 <% if experiment_chitika_on %>
+				 data-ad-slot="7996428119"
+				 <% else %>
+				 data-ad-slot="1865604119"
+				 <% end %>
+				 data-ad-format="auto"></ins>
+			<script>
+			(adsbygoogle = window.adsbygoogle || []).push({});
+			</script>
+		</div>
+	<% end %>
+
+	<div id="info-tables">
+
+		<table id="style-author-info">
+			<tr>
+				<th>Author</th>
+				<td><%= link_to (h @style.user.name), {:controller => "users", :action => "show", :id => @style.user.id}, :rel => 'nofollow dct:creator' %></td>
+			</tr>
+			<tr>
+				<th>License</th>
+				<td>
+					<% if !@style.effective_license.nil? %>
+						<% case @style.effective_license 
+							when 'publicdomain' %>
+								<a class="license-image" rel="license nofollow" href="http://creativecommons.org/publicdomain/zero/1.0/"><img src="<%=asset_path 'cc/cc0.png'%>" style="border-style: none; width: 80px; height: 15px;" alt="CC0"></a>
+							<% when 'ccby' %>
+								<a class="license-image" rel="license nofollow" href="http://creativecommons.org/licenses/by/4.0/"><img alt="CC BY" style="border-width:0; width: 80px; height: 15px;" src="<%=asset_path 'cc/cc-by.png'%>"></a>
+							<% when 'ccbysa' %>
+								<a class="license-image" rel="license nofollow" href="http://creativecommons.org/licenses/by-sa/4.0/"><img alt="CC BY-SA" style="border-width:0; width: 80px; height: 15px;" src="<%=asset_path 'cc/cc-by-sa.png'%>"></a>
+							<% when 'ccbynd' %>
+								<a class="license-image" rel="license nofollow" href="http://creativecommons.org/licenses/by-nd/4.0/"><img alt="CC BY-ND" style="border-width:0; width: 80px; height: 15px;" src="<%=asset_path 'cc/cc-by-nd.png'%>"></a>
+							<% when 'ccbync' %>
+								<a class="license-image" rel="license nofollow" href="http://creativecommons.org/licenses/by-nc/4.0/"><img alt="CC BY-NC" style="border-width:0; width: 80px; height: 15px;" src="<%=asset_path 'cc/cc-by-nc.png'%>"></a>
+							<% when 'ccbyncsa' %>
+								<a class="license-image" rel="license nofollow" href="http://creativecommons.org/licenses/by-nc-sa/4.0/"><img alt="CC-NC-SA" style="border-width:0; width: 80px; height: 15px;" src="<%=asset_path 'cc/cc-by-nc-sa.png'%>"></a>
+							<% when 'ccbyncnd' %>
+								<a class="license-image" rel="license nofollow" href="http://creativecommons.org/licenses/by-nc-nd/4.0/"><img alt="CC BY-NC-ND" style="border-width:0; width: 80px; height: 15px;" src="<%=asset_path 'cc/cc-by-nc-nd.png'%>"></a>
+							<% when 'arr' %>
+								<span class="license-title">© <a href="<%=url_for(@style.user)%>"><%=@style.user.name%></a>.
+						<% end 
+					else %>
+						<span class="license-title">© <a href="<%=url_for(@style.user)%>"><%=@style.user.name%></a>.
+					<% end %>
+				</td>
+			</tr>
+			<tr>
+				<th>Created</th>
+				<td><%=@style.created.strftime("%b %e, %Y")%></td>
+			</tr>
+			<tr>
+				<th>Updated</th>
+				<td><%=@style.updated.strftime("%b %e, %Y")%></td>
+			</tr>
+		</table>
+		<table id="style-install-info">
+			<tr>
+				<th>Installs (this week)</th>
+				<td><%=number_with_delimiter(@style.weekly_install_count)%></td>
+			</tr>
+			<tr>
+				<th>Installs (total)</th>
+				<td><%=number_with_delimiter(@style.total_install_count)%></td>
+			</tr>
+			<% if !@style.rating.nil? %>
+			<tr>
+				<th>Average rating</th>
+				<td><%=render partial: 'rating_image', locals: {style: @style}%></td>
+			</tr>
+			<% end %>
+			<tr>
+				<td><a href="#view-code" id="show-button">Show CSS</a></td>
+			</tr>
+		</table>
+	</div>
+
+	<div id="show-code">
+		<pre id="view-code"><code id="stylish-code"></code></pre>
+	</div>
+
+	<% if session[:user_id] == @style.user_id %>
+		<div id="control-panel">
+			<%=link_to "Edit", :action => "edit"%>
+			<%=link_to (@style.obsolete == 1 ? "Undelete" : "Delete"), :action => "delete"%>
+			<%=link_to 'Stats', :action => 'stats'%>
+		</div>
+	<% end %>
+
+</section>
+
+<% if !@style.additional_info.nil? && !@style.additional_info.empty? %>
+	<section id="additional-info">
+		<h2>Notes</h2>
+		<div id="additional-info-text">
+			<%=format_user_text(@style.additional_info)%>
+		</div>
+	</section>
+<% end %>
+
+<% if (@no_ads.nil? or !@no_ads) and !show_ad_above_meta %>
+	<div id="below-meta-ad" class="ad">
+		<div class="ad-note"><span>Advertisement</span></div>
+		<script async src="//pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"></script>
+		<!-- Style pages below meta responsive -->
+		<ins class="adsbygoogle"
+			 style="display:block"
+			 data-ad-client="ca-pub-2247465624637408"
+			 data-ad-slot="8140651313"
+			 data-ad-format="auto"></ins>
+		<script>
+		(adsbygoogle = window.adsbygoogle || []).push({});
+		</script>
+	</div>
+<% end %>
+
+<section id="discussions-area">
+	<h2>Feedback</h2>
+
+	<%= render :partial => 'social', :locals => {:classe => 'single-style', :style => @style} %>
+
+	<% if !@style.pledgie_id.nil? %>
+		<p id="pledgie">
+			Thank <%= link_to (h @style.user.name), {:controller => "users", :action => "show", :id => @style.user.id}, :rel => 'nofollow' %> for creating this style by donating via Pledgie:
+			<a href='https://pledgie.com/campaigns/<%=@style.pledgie_id%>'><img alt='Donate for <%=@style.short_description%>' src='https://pledgie.com/campaigns/<%=@style.pledgie_id%>.png?skin_name=chrome' height='37' width='149' border='0'></a>.
+		</p>
+	<% end %>
+	<% if !@style.user.paypal_email.nil?%>
+		<form id="donate" class="paypal-user-donate" name="_xclick" action="https://www.paypal.com/cgi-bin/webscr" method="post">
+			<input type="hidden" name="cmd" value="_xclick">
+			<input type="hidden" name="business" value="<%=obfuscate(@style.user.paypal_email)%>">
+			<input type="hidden" name="item_name" value="'<%=@style.short_description%>' on userstyles.org">
+			<p>Thank <%= link_to (h @style.user.name), {:controller => "users", :action => "show", :id => @style.user.id}, :rel => 'nofollow' %> for creating this style by donating via PayPal:
+			<input type="image" src="<%=asset_path('/images/donate-button.gif')%>" alt="Donate">.
+			</p>
+		</form>
+	<% end %>
+
+	<h3>Discussions</h3>
+
+	<div id="post-discussion"></div>
+
+	<div id="login-form" style="display:none">
+		<%= render(:partial => 'login/form', :locals => {:skip_remember => true, :login_reason => 'You need to be logged in to be able to start a discussion.', :return_to => "//#{FORUM_DOMAIN}/post/discussion?Discussion/StyleID=#{@style.id}"}) %>
+	</div>
+
+	<% if @style.discussions.empty? %>
+		<p id="no-discussions">No discussions posted yet. <a id="start-discussion" href="//<%=FORUM_DOMAIN%>/post/discussion?Discussion/StyleID=<%=@style.id%>" rel="nofollow">Be the first to ask a question or review this style.</a></p>
+	<% elsif @style.recent_discussions.empty? %>
+		<p id="no-discussions">No discussions posted in the last year. <a href="//<%=FORUM_DOMAIN%>/?Discussion/StyleID=<%=@style.id%>" rel="nofollow">See older discussions.</a> <a id="start-discussion" href="//<%=FORUM_DOMAIN%>/post/discussion?Discussion/StyleID=<%=@style.id%>" rel="nofollow">Ask a new question or add a review for this style.</a></p>
+	<% else %>
+		<p id="no-discussions"><a id="start-discussion" href="//<%=FORUM_DOMAIN%>/post/discussion?Discussion/StyleID=<%=@style.id%>" rel="nofollow">Ask a new question or add a review for this style.</a></p>
+		<ul id="discussions">
+			<% @style.recent_discussions.reverse.each do |discussion|
+				rating_class = nil
+				case discussion.Rating
+					when 0
+						rating_class = "no-rating"
+					when 1
+						rating_class = "bad-rating"
+					when 2
+						rating_class = "ok-rating"
+					when 3
+						rating_class = "good-rating"
+				end %>
+				<li class="<%=rating_class%>"><%=link_to h(discussion.name), discussion.url, {:rel => 'nofollow'}%><% if discussion.original_poster %> by <%=link_to h(discussion.original_poster.name), {:controller => 'users', :action => 'show', :id => discussion.original_poster.id}, {:rel => 'nofollow'}%><%end%><%if !discussion.created.nil?%>, <%=discussion.created.strftime('%B %e, %Y')%><% end %></li>
+			<% end %>
+			<% if @style.discussions.size != @style.recent_discussions.size %>
+				<li><a href="//<%=FORUM_DOMAIN%>/?Discussion/StyleID=<%=@style.id%>" rel="nofollow">See more discussions</a></li>
+			<% end %>
+		</ul>
+	<% end %>
+</section>
+
+<% end %>
